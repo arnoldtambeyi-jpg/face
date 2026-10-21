@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Assistant</title>
+<style>
+:root{--bg:#f1f3fb;--blob:#7b8cff;--ink:#14183a;--btn:#ffffff;--btn-ink:#14183a;--line:#c9cef0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a0d24;--blob:#5b6cff;--ink:#e9ecff;--btn:#171c45;--btn-ink:#e9ecff;--line:#2a3070}}
+:root[data-theme="dark"]{--bg:#0a0d24;--blob:#5b6cff;--ink:#e9ecff;--btn:#171c45;--btn-ink:#e9ecff;--line:#2a3070}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS",Verdana,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:20px 16px;gap:16px}
+h1{font-size:1.1rem;font-weight:600;margin:0;text-align:center}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+.face{position:relative;width:min(78vw,340px);height:min(70vw,300px);background:var(--blob);border-radius:46% 54% 50% 50% / 55% 55% 45% 45%;cursor:pointer;transition:border-radius .4s,transform .3s;-webkit-tap-highlight-color:transparent}
+.eye{position:absolute;top:34%;width:13%;height:26%;background:#fff;border-radius:999px;transition:height .25s,top .25s,border-radius .25s,transform .25s;animation:blink 4.5s infinite}
+.eye.l{left:30%}.eye.r{right:30%}
+.mouth{position:absolute;left:50%;top:68%;width:16%;height:8%;transform:translateX(-50%);border:5px solid #fff;border-top:0;border-radius:0 0 999px 999px;transition:all .3s}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}}
+.happy .eye{height:22%}
+.happy .mouth{width:22%;height:11%}
+.sad .eye{height:22%;transform:translateY(8%)}
+.sad .mouth{width:16%;height:8%;border:5px solid #fff;border-bottom:0;border-radius:999px 999px 0 0;top:72%}
+.surprised .eye{width:15%;height:30%;top:30%}
+.surprised .mouth{width:9%;height:11%;border:5px solid #fff;border-radius:50%;top:68%}
+.thinking .eye{height:24%}
+.thinking .eye.r{transform:translateY(-10%)}
+.thinking .mouth{width:10%;height:0;border-radius:0;left:60%;top:72%}
+.sleepy .eye{height:5%;top:42%;animation:none}
+.sleepy .mouth{width:8%;height:0;border-radius:0;top:70%}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:420px}
+button{font:inherit;font-size:1rem;padding:12px 18px;border-radius:999px;border:1.5px solid var(--line);background:var(--btn);color:var(--btn-ink);cursor:pointer}
+button:focus-visible{outline:3px solid var(--blob);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--blob);color:#fff;border-color:var(--blob)}
+input{font:inherit;font-size:1rem;padding:12px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--btn);color:var(--btn-ink);width:240px}
+p{margin:0;font-size:.9rem;opacity:.75;text-align:center}
+@keyframes talk{from{transform:translateX(-50%) scaleY(1)}to{transform:translateX(-50%) scaleY(1.7)}}
+.talking .mouth{animation:talk .28s infinite alternate}
+@media (prefers-reduced-motion:reduce){.eye{animation:none}*{transition:none!important}}
+</style>
+</head>
+<body>
+<h1>My Assistant</h1>
+<div class="stage"><div class="face happy" id="face" aria-label="Assistant face"><div class="eye l"></div><div class="eye r"></div><div class="mouth"></div></div></div>
+<div class="row" id="row"></div>
+<button id="talk" style="font-size:1.15rem;padding:16px 32px">Talk</button>
+<p id="status">Tap Talk, then ask me anything.</p>
+<div id="keybox" class="row"><input id="key" type="password" placeholder="Paste your Gemini key" autocomplete="off"><button id="savekey">Save key</button></div>
+<button id="forget" style="font-size:.85rem;padding:8px 14px;display:none">Forget key</button>
+<script>
+var moods=["happy","sad","surprised","thinking","sleepy"];
+var face=document.getElementById("face"),row=document.getElementById("row"),cur=0;
+function setMood(m){
+  face.className="face "+m;cur=moods.indexOf(m);
+  var b=row.children;for(var i=0;i<b.length;i++){b[i].setAttribute("aria-pressed",b[i].dataset.m===m)}
+}
+moods.forEach(function(m){
+  var b=document.createElement("button");b.textContent=m.charAt(0).toUpperCase()+m.slice(1);b.dataset.m=m;
+  b.onclick=function(){setMood(m)};row.appendChild(b);
+});
+face.onclick=function(){setMood(moods[(cur+1)%moods.length])};
+setMood("happy");
+var statusEl=document.getElementById("status"),talk=document.getElementById("talk");
+var keybox=document.getElementById("keybox"),keyIn=document.getElementById("key"),forget=document.getElementById("forget");
+var MODEL="gemini-flash-latest",history=[],busy=false;
+var SYSTEM="You are a friendly voice assistant with an animated face, talking to a teacher. Reply in one or two short spoken sentences, no lists, no emojis. Start every reply with exactly one mood tag in square brackets, chosen from [happy], [sad], [surprised], [thinking], [sleepy], matching the feeling of your reply.";
+function getKey(){try{return localStorage.getItem("gkey")||""}catch(e){return ""}}
+function showKey(){var has=!!getKey();keybox.style.display=has?"none":"flex";forget.style.display=has?"inline-block":"none"}
+document.getElementById("savekey").onclick=function(){var k=keyIn.value.trim();if(!k)return;try{localStorage.setItem("gkey",k)}catch(e){}keyIn.value="";showKey();statusEl.textContent="Key saved. Tap Talk."};
+forget.onclick=function(){try{localStorage.removeItem("gkey")}catch(e){}history=[];showKey();statusEl.textContent="Key removed from this phone."};
+showKey();
+function speak(t){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance(t);
+  u.onstart=function(){face.classList.add("talking")};
+  u.onend=function(){face.classList.remove("talking")};
+  speechSynthesis.speak(u);
+}
+var MODELS=["gemini-flash-latest","gemini-2.5-flash"];
+function callGemini(model,key){
+  var ctl=new AbortController(),t=setTimeout(function(){ctl.abort()},20000);
+  return fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",{
+    method:"POST",signal:ctl.signal,
+    headers:{"Content-Type":"application/json","x-goog-api-key":key},
+    body:JSON.stringify({systemInstruction:{parts:[{text:SYSTEM}]},contents:history.slice(-12)})
+  }).then(function(r){clearTimeout(t);return r.json().then(function(d){return {ok:r.ok,d:d,model:model}})},function(e){clearTimeout(t);throw e});
+}
+function fail(msg){busy=false;history.pop();setMood("sad");statusEl.textContent=msg}
+function ask(text){
+  var key=getKey();
+  if(!key){statusEl.textContent="Paste your Gemini key first.";return}
+  busy=true;setMood("thinking");statusEl.textContent="Thinking...";
+  history.push({role:"user",parts:[{text:text}]});
+  var i=0;
+  function attempt(){
+    statusEl.textContent="Thinking... ("+MODELS[i]+")";
+    callGemini(MODELS[i],key).then(function(x){
+      if(!x.ok){
+        var msg=(x.d.error&&x.d.error.message)||"unknown error";
+        if(i<MODELS.length-1){i++;attempt();return}
+        fail("Gemini said: "+msg);return;
+      }
+      var out="";try{out=x.d.candidates[0].content.parts.map(function(p){return p.text||""}).join("")}catch(e){}
+      if(!out){fail("Empty answer from "+x.model+". Try again.");return}
+      busy=false;
+      history.push({role:"model",parts:[{text:out}]});
+      var m=out.match(/^\s*\[(happy|sad|surprised|thinking|sleepy)\]\s*/i),mood="happy";
+      if(m){mood=m[1].toLowerCase();out=out.slice(m[0].length)}
+      setMood(mood);statusEl.textContent=out;speak(out);
+    },function(e){
+      if(i<MODELS.length-1){i++;attempt();return}
+      fail(e&&e.name==="AbortError"?"No reply after 20 seconds. Check your internet and try again.":"Could not reach Gemini: "+(e&&e.message||"network error"));
+    });
+  }
+  attempt();
+}
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=null,listening=false;
+talk.onclick=function(){
+  if(busy)return;
+  if(!SR){statusEl.textContent="This browser can't listen. Use Chrome.";return}
+  if(listening){rec.stop();return}
+  rec=new SR();rec.lang="en-US";rec.interimResults=false;
+  rec.onstart=function(){listening=true;talk.textContent="Listening...";setMood("surprised");statusEl.textContent="Listening..."};
+  rec.onresult=function(e){var t=e.results[0][0].transcript;statusEl.textContent="You: "+t;ask(t)};
+  rec.onerror=function(e){setMood("happy");statusEl.textContent=e.error==="not-allowed"?"Microphone is blocked. Allow it in Chrome.":"Could not hear you ("+e.error+"). Try again."};
+  rec.onend=function(){listening=false;talk.textContent="Talk"};
+  rec.start();
+};
+</script>
+</body>
+</html>
