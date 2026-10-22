@@ -64,7 +64,7 @@ face.onclick=function(){setMood(moods[(cur+1)%moods.length])};
 setMood("happy");
 var statusEl=document.getElementById("status"),talk=document.getElementById("talk");
 var keybox=document.getElementById("keybox"),keyIn=document.getElementById("key"),forget=document.getElementById("forget");
-var MODEL="gemini-flash-latest",history=[],busy=false;
+var MODEL="gemini-2.5-flash",history=[],busy=false;
 var SYSTEM="You are a friendly voice assistant with an animated face, talking to a teacher. Reply in one or two short spoken sentences, no lists, no emojis. Start every reply with exactly one mood tag in square brackets, chosen from [happy], [sad], [surprised], [thinking], [sleepy], matching the feeling of your reply.";
 function getKey(){try{return localStorage.getItem("gkey")||""}catch(e){return ""}}
 function showKey(){var has=!!getKey();keybox.style.display=has?"none":"flex";forget.style.display=has?"inline-block":"none"}
@@ -79,7 +79,7 @@ function speak(t){
   u.onend=function(){face.classList.remove("talking")};
   speechSynthesis.speak(u);
 }
-var MODELS=["gemini-flash-latest","gemini-2.5-flash"];
+var MODELS=["gemini-2.5-flash"];
 function callGemini(model,key){
   var ctl=new AbortController(),t=setTimeout(function(){ctl.abort()},20000);
   return fetch("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",{
